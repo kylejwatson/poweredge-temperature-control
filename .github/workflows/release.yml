@@ -34,8 +34,13 @@ jobs:
             "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
             -o zig.tar.xz
           tar -xf zig.tar.xz
-          ZIG_DIR="zig-x86_64-linux-${ZIG_VERSION}"
-          echo "$PWD/${ZIG_DIR}" >> "$GITHUB_PATH"
+          ZIG_DIR="$(find "$PWD" -maxdepth 1 -type d -name "zig-*-${ZIG_VERSION}" | head -n 1)"
+          if [[ -z "${ZIG_DIR}" ]]; then
+            echo "Could not find extracted Zig directory" >&2
+            exit 1
+          fi
+          export PATH="${ZIG_DIR}:$PATH"
+          echo "${ZIG_DIR}" >> "$GITHUB_PATH"
           zig version
 
       - name: Build release binary
