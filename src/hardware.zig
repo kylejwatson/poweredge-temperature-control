@@ -1,6 +1,5 @@
 const builtin = @import("builtin");
 const std = @import("std");
-const command = @import("command.zig");
 
 const linux = std.os.linux;
 
@@ -44,7 +43,7 @@ const ipmi = struct {
 };
 
 pub fn maxTemperature(allocator: std.mem.Allocator) !u8 {
-    if (readSensors(allocator)) |value| {
+    if (readHwmon(allocator)) |value| {
         return value;
     }
 
@@ -63,48 +62,57 @@ pub fn setFanPercent(allocator: std.mem.Allocator, percent: u8) !void {
     try state.sendAndCheck(0x30, 0x30, &[_]u8{ 0x02, 0xff, percent });
 }
 
-fn readSensors(allocator: std.mem.Allocator) ?u8 {
-    const output = command.captureStdout(allocator, &[_][]const u8{"sensors"}) catch return null;
-    defer allocator.free(output);
-    return parseSensorsOutput(output);
-}
+fn readHwmon(allocator: std.mem.Allocator) ?u8 {
+    if (builtin.os.tag != .linux) return null;
 
-fn parseSensorsOutput(output: []const u8) ?u8 {
-    var found = false;
-    var best: u8 = 0;
+    var hwmon_dir = std.fs.openDirAbsolute("/sys/class/hwmon", .{ .iterate = true }) catch return null;
+    defer hwmon_dir.close();
 
-    var lines = std.mem.splitScalar(u8, output, '\n');
-    while (lines.next()) |line| {
-        var tokens = std.mem.tokenizeAny(u8, line, " \t");
-        while (tokens.next()) |token| {
-            if (parseTemperatureToken(token)) |value| {
-                if (!found or value > best) {
-                    best = value;
-                    found = true;
-                }
-            }
+    var best: ?u8 = null;
+    var iter = hwmon_dir.iterate();
+    while (iter.next() catch return null) |entry| {
+        if (entry.kind != .directory) continue;
+
+        var sensor_dir = hwmon_dir.openDir(entry.name, .{ .iterate = true }) catch continue;
+        defer sensor_dir.close();
+
+        const value = readMaxTempInDir(allocator, sensor_dir) catch continue;
+        if (value) |temp| {
+            if (best == null or temp > best.?) best = temp;
         }
     }
 
-    if (!found) return null;
     return best;
 }
 
-fn parseTemperatureToken(token: []const u8) ?u8 {
-    var cleaned = std.mem.trimLeft(u8, token, "+");
+fn readMaxTempInDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !?u8 {
+    var best: ?u8 = null;
+    var iter = dir.iterate();
+    while (iter.next() catch return null) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.startsWith(u8, entry.name, "temp") or !std.mem.endsWith(u8, entry.name, "_input")) continue;
 
-    while (cleaned.len > 0 and cleaned[cleaned.len - 1] == 'C') {
-        cleaned = cleaned[0 .. cleaned.len - 1];
+        const file = dir.openFile(entry.name, .{}) catch continue;
+        defer file.close();
+
+        const raw = file.readToEndAlloc(allocator, 64) catch continue;
+        defer allocator.free(raw);
+
+        const value = parseMilliCelsius(raw) catch continue;
+        if (best == null or value > best.?) best = value;
     }
 
-    while (cleaned.len > 0 and cleaned[cleaned.len - 1] >= 128) {
-        cleaned = cleaned[0 .. cleaned.len - 1];
-    }
+    return best;
+}
 
-    if (cleaned.len == 0) return null;
-    const value = std.fmt.parseFloat(f64, cleaned) catch return null;
-    if (value < 0) return null;
-    return @as(u8, @intFromFloat(@floor(value)));
+fn parseMilliCelsius(bytes: []const u8) !u8 {
+    const trimmed = std.mem.trim(u8, bytes, " \t\r\n");
+    if (trimmed.len == 0) return error.InvalidTemperatureReading;
+
+    const milli_celsius = try std.fmt.parseInt(i64, trimmed, 10);
+    if (milli_celsius < 0) return error.InvalidTemperatureReading;
+
+    return @as(u8, @intCast(@min(@divTrunc(milli_celsius, 1000), 255)));
 }
 
 const IpmiState = if (builtin.os.tag == .linux) struct {
