@@ -1,0 +1,18 @@
+[Unit]
+Description=PowerEdge temperature-based fan control
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/temp-control --daemon --config /etc/temp-control.conf
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
