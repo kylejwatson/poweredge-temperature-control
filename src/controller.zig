@@ -32,14 +32,10 @@ pub const FanController = struct {
 
     pub fn runDaemon(self: *FanController, allocator: std.mem.Allocator) !void {
         std.log.info(
-            "daemon_start interval={d}s low={d}% mid={d}% high={d}% mid_temp={d}C high_temp={d}C",
+            "daemon_start interval={d}s points={d}",
             .{
                 self.config.interval_seconds,
-                self.config.low_fan,
-                self.config.mid_fan,
-                self.config.high_fan,
-                self.config.mid_temp,
-                self.config.high_temp,
+                self.config.points.len,
             },
         );
 
@@ -52,18 +48,6 @@ pub const FanController = struct {
     }
 
     fn targetFan(self: FanController, temperature: u8) u8 {
-        if (temperature > self.config.high_temp) {
-            return self.config.high_fan;
-        }
-
-        if (temperature > self.config.mid_temp) {
-            return self.config.mid_fan;
-        }
-
-        if ((self.current_fan == self.config.high_fan or self.current_fan == self.config.mid_fan) and temperature < self.config.mid_temp) {
-            return self.config.low_fan;
-        }
-
-        return self.current_fan;
+        return config_mod.fanForTemperature(self.config.points, temperature);
     }
 };

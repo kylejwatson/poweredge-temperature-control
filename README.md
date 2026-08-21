@@ -35,25 +35,21 @@ sudo install -m 755 zig-out/bin/temp-control /usr/local/bin/temp-control
 
 Copy `config.example.conf` to `/etc/temp-control.conf` or point the program at a custom file with `--config`.
 
-The file format is simple `key=value` pairs:
+The file format is simple `key=value` pairs. Define the fan curve with one or more `point=temp,fan` entries:
 
 ```conf
-high_temp=60
-mid_temp=40
-low_fan=15
-mid_fan=50
-high_fan=100
+point=0,15
+point=40,50
+point=60,100
 interval_seconds=5
 ```
 
 Recognized keys are:
 
-- `high_temp`
-- `mid_temp`
-- `low_fan`
-- `mid_fan`
-- `high_fan`
+- `point`
 - `interval_seconds`
+
+Curve points are sorted by temperature at load time and the controller linearly interpolates between neighboring points. Temperatures below the first point clamp to the first fan speed; temperatures above the last point clamp to the last fan speed.
 
 ## Run
 
