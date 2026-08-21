@@ -1,12 +1,12 @@
 # temp-control
 
-`temp-control` is a small Zig fan controller for Dell PowerEdge-style systems. It samples temperatures from `sensors` first, falls back to `ipmitool`, and sets fan speed with `ipmitool raw`.
+`temp-control` is a small Zig fan controller for Dell PowerEdge-style systems. It samples temperatures from `sensors` and sets fan speed by talking directly to `/dev/ipmi0` through the Linux IPMI ioctl interface.
 
 ## Requirements
 
 - Zig 0.14 or newer
-- `ipmitool`
 - `lm-sensors` if you want local sensor readings from `sensors`
+- Linux IPMI kernel support (`ipmi_si` and `ipmi_devintf`) on the target machine
 - Permission to issue IPMI raw commands, which usually means running as `root` or via `sudo`
 
 ## Build
@@ -66,3 +66,5 @@ temp-control --daemon --config /etc/temp-control.conf
 ```
 
 If no config file is present at `/etc/temp-control.conf`, the built-in defaults are used.
+
+On Linux, the fan-control path uses `/dev/ipmi0` directly and does not require `ipmitool`.
