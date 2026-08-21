@@ -71,7 +71,7 @@ fn readHwmon(allocator: std.mem.Allocator) ?u8 {
     var best: ?u8 = null;
     var iter = hwmon_dir.iterate();
     while (iter.next() catch return null) |entry| {
-        if (entry.kind != .directory) continue;
+        if (entry.kind != .directory and entry.kind != .sym_link) continue;
 
         var sensor_dir = hwmon_dir.openDir(entry.name, .{ .iterate = true }) catch continue;
         defer sensor_dir.close();
