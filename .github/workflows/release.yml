@@ -33,8 +33,9 @@ jobs:
           curl -fL --retry 5 --retry-delay 3 --retry-all-errors \
             "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
             -o zig.tar.xz
+          ZIG_DIR="$(tar -tf zig.tar.xz | head -1 | cut -d/ -f1)"
           tar -xf zig.tar.xz
-          echo "$PWD/zig-linux-x86_64-${ZIG_VERSION}" >> "$GITHUB_PATH"
+          echo "$PWD/${ZIG_DIR}" >> "$GITHUB_PATH"
           zig version
 
       - name: Build release binary
